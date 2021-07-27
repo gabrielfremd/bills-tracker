@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState, useCallback} from "react";
+import React, { useContext, useEffect, useState, useCallback } from "react";
 import { GlobalContext, DispatchTypes } from "context";
 import {
   ArrowIndicatorIcon,
@@ -12,7 +12,8 @@ import Utils from "lib/utils";
 
 const Main = () => {
   const { moneyToNumber } = Utils.Currency;
-  const { nowYear, nowMonth, pastMonthYear, todayDate } = Utils.Date;
+  const { nowYear, nowMonth, pastMonthYear, todayDate, formatDate } =
+    Utils.Date;
 
   const [mainLoading, setMainLoading] = useState(true);
   const [totalMonth, setTotalMonth] = useState(0);
@@ -44,31 +45,53 @@ const Main = () => {
   const [, modalDispatch] = context.globalModal;
   const { user, doc, loading } = userState;
 
-  const getStartData = useCallback(async (doc) => {
-    setMainLoading(true);
+  const alertModal = (title, content) => {
+    modalDispatch({
+      type: DispatchTypes.Modal.MODAL_SHOW,
+      title,
+      content,
+      actions: [
+        {
+          text: "Ok",
+          action: () => {
+            modalDispatch({ type: DispatchTypes.Modal.MODAL_HIDE });
+          },
+        },
+      ],
+    });
+  };
 
-    const types = await getTypes(doc);
-    const pastMonthYearValue = pastMonthYear();
+  const getStartData = useCallback(
+    async (doc) => {
+      setMainLoading(true);
 
-    const totalMonthValue = await getTotalByMonth(doc, nowMonth(), nowYear());
-    const totalPastMonthValue = await getTotalByMonth(
-      doc,
-      pastMonthYearValue.month,
-      pastMonthYearValue.year
-    );
+      const types = await getTypes(doc);
+      const pastMonthYearValue = pastMonthYear();
 
-    const typesFormatted = types.map((type) => ({ value: type, label: type }));
+      const totalMonthValue = await getTotalByMonth(doc, nowMonth(), nowYear());
+      const totalPastMonthValue = await getTotalByMonth(
+        doc,
+        pastMonthYearValue.month,
+        pastMonthYearValue.year
+      );
 
-    setBillsTypes(typesFormatted);
-    setTotalMonth(totalMonthValue);
-    setPastMonth(totalPastMonthValue);
+      const typesFormatted = types.map((type) => ({
+        value: type,
+        label: type,
+      }));
 
-    setGratherThanPastMonth(
-      moneyToNumber(totalMonthValue) > moneyToNumber(totalPastMonthValue)
-    );
+      setBillsTypes(typesFormatted);
+      setTotalMonth(totalMonthValue);
+      setPastMonth(totalPastMonthValue);
 
-    setMainLoading(false);
-  }, [moneyToNumber, nowMonth, nowYear, pastMonthYear]);
+      setGratherThanPastMonth(
+        moneyToNumber(totalMonthValue) > moneyToNumber(totalPastMonthValue)
+      );
+
+      setMainLoading(false);
+    },
+    [moneyToNumber, nowMonth, nowYear, pastMonthYear]
+  );
 
   useEffect(() => {
     if (!loading) {
@@ -89,37 +112,29 @@ const Main = () => {
 
     if (amount && type && date && user.name) {
       setMainLoading(true);
+      const formattedDate = formatDate(date);
       try {
         const addAction = await addRow(
           doc,
-          date,
+          formattedDate,
           user.name,
           amount,
           type,
           description
         );
         if (addAction) {
-          modalDispatch({
-            type: DispatchTypes.Modal.MODAL_SHOW,
-            title: "Bill added",
-            content: "Your bill was added to spreadsheet sucssesfully!",
-            actions: [
-              {
-                text: "Ok",
-                action: () => {
-                  modalDispatch({ type: DispatchTypes.Modal.MODAL_HIDE });
-                  getStartData(doc);
-                },
-              },
-            ],
-          });
+          alertModal(
+            "Bill added",
+            "Your bill was added to spreadsheet sucssesfully!"
+          );
+          getStartData(doc);
           clearForm();
         } else {
-          // TODO: Error mesg
+          alertModal("Error", "Please, try again.");
         }
         setMainLoading(false);
       } catch (error) {
-        // TODO: Error mesg
+        alertModal("Error", "Please, try again.");
         setMainLoading(false);
       }
     }
